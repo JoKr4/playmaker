@@ -316,9 +316,9 @@ class Play(object):
             print('Downloading %s' % docid)
             try:
                 if details.get('offer')[0].get('micros') == 0:
-                    data_gen = self.service.download(docid, details['versionCode'])
+                    data_gen = self.service.download(docid, details.get('details').get('appDetails')['versionCode'])
                 else:
-                    data_gen = self.service.delivery(docid, details['versionCode'])
+                    data_gen = self.service.delivery(docid, details.get('details').get('appDetails')['versionCode'])
                 data_gen = data_gen.get('file').get('data')
             except IndexError as exc:
                 print(exc)
@@ -356,15 +356,15 @@ class Play(object):
         else:
             toUpdate = []
             for app in self.currentSet:
-                details = self.details(app.get('docId'))
+                details = self.details(app.get('docid'))
                 if details is None:
                     print('%s not available in Play Store' % app['docId'])
                     continue
                 details['filename'] = app.get('filename')
                 if self.debug:
-                    print('Checking %s' % app['docId'])
-                    print('%d == %d ?' % (app['versionCode'], details['versionCode']))
-                if app['versionCode'] != details['versionCode']:
+                    print('Checking %s' % app['docid'])
+                    print('%d == %d ?' % (app.get('details').get('appDetails')['versionCode'], details.get('details').get('appDetails')['versionCode']))
+                if app.get('details').get('appDetails')['versionCode'] !=  details.get('details').get('appDetails')['versionCode']:
                     toUpdate.append(details)
         return {'status': 'SUCCESS',
                 'message': toUpdate}
