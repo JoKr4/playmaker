@@ -19,7 +19,7 @@ setup(name='playmaker',
           ],
       },
       install_requires=[
-            'pyaxmlparser',
+            'pyaxmlparser>=0.3.24',
             'pycryptodome',
             'tornado<5',
             'gpapi>=0.4.2',
