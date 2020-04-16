@@ -52,6 +52,7 @@ if __name__ == '__main__':
     if 'google' in auth_file_parser:
         google_section = auth_file_parser['google']
         if 'email' in google_section and 'password' in google_section:
+            print('Using email and password from credentials file')
             service.set_credentials(google_section['email'], google_section['password'])
         elif 'gsfId' in google_section and 'token' in google_section:
             service.set_token_credentials(google_section['gsfId'], google_section['token'])
