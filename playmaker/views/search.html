@@ -42,7 +42,7 @@
           <td>{{app.title}}</td>
           <td>{{app.creator}}</td>
           <td>{{app.docid}}</td>
-          <td>{{app.details.appDetails.versionCode}}</td>
+          <td>{{app.details.appDetails.versionString}}</td>
           <td>{{ ((app.details.appDetails.file[0].size)/(1024*1024)).toFixed(2) }} MB</td>
           <td>{{app.aggregateRating.starRating.toFixed(2)}} Stars</td>
         </tr>
@@ -57,7 +57,7 @@
       <div class="modal-body" id="modal-body">
         <strong>Id:</strong> {{app.docid}}<br>
         <strong>Developer:</strong> {{app.creator}}<br>
-        <strong>Version:</strong> {{app.details.appDetails.versionCode}}<br>
+        <strong>Version:</strong> {{app.details.appDetails.versionString}}<br>
         <strong>Size:</strong> {{ ((app.details.appDetails.file[0].size)/(1024*1024)).toFixed(2) }} MB<br>
         <strong>Stars:</strong> {{app.aggregateRating.starRating.toFixed(2)}}
       </div>
