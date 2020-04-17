@@ -243,7 +243,7 @@ app.component('searchView', {
           d.downloading = false;
           d.disabled = false;
         });
-        ctrl.results = data.message[0].child[0].child;
+        ctrl.results = data.message;
         ctrl.searching = false;
       });
     };
