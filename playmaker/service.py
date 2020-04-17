@@ -7,7 +7,10 @@ import os
 import sys
 import concurrent.futures
 import locale as locale_service
+import json
+import dict_digger
 from datetime import datetime as dt
+from pathlib import Path
 
 NOT_LOGGED_IN_ERR = 'Not logged in'
 WRONG_CREDENTIALS_ERR = 'Wrong credentials'
@@ -19,33 +22,27 @@ def makeError(message):
     return {'status': 'ERROR',
             'message': message}
 
+def get_app_detail(app, key):
+    return dict_digger.dig(app, 'details', 'appDetails', key)
 
+# XXX needed? store json?
 def get_details_from_apk(apk, downloadPath, service):
-    if apk is not None:
-        filepath = os.path.join(downloadPath, apk)
-        try:
-            a = APK(filepath)
-        except Exception as e:
-            print(e)
-            return None
-        packageName = a.package
-        print('Fetching Details from Playstore for %s' % packageName)
-        try:
-            # https://github.com/NoMore201/googleplay-api/commit/04ae986e00d097fb9db27f8d6bdd494f34af5f3d @2020_04_16
-            details = service.details(packageName)
-            # TODO just store everything and change key access everywhere
-            appDetails = details.get('details').get('appDetails')
-            appDetails['title'] = details['title']
-        except RequestError as e:
-            print('Cannot fetch Details from Playstore for %s' % packageName)
-            print('Fallback to last known Details...')
-            return {'packageName': packageName,
-                    'versionCode': int(a.version_code),
-                    'title': a.application}
-        print('Added {} to cache'.format(packageName))
-    return appDetails
+    try:
+        a = APK(downloadPath / apk)
+    except Exception as e:
+        print(e)
+        return None
+    packageName = a.package
+    print('Fetching Details from Playstore for %s' % packageName)
+    try:
+        details = service.details(packageName)
+    except RequestError as e:
+        print('Cannot fetch Details from Playstore for %s' % packageName)
+        return None
+    return details
 
 
+# TODO free all functions
 class Play(object):
     def __init__(self, debug=True, fdroid=False):
         self.currentSet = []
@@ -62,7 +59,7 @@ class Play(object):
 
         # configuring download folder
         if self.fdroid:
-            self.download_path = os.path.join(os.getcwd(), 'repo')
+            self.download_path = Path.cwd() / 'repo'
         else:
             self.download_path = os.getcwd()
 
@@ -227,11 +224,10 @@ class Play(object):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
+        # XXX just read json?! and call check_local_apks?!
         print('Updating cache')
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            # get application ids from apk files
-            apkFiles = [apk for apk in os.listdir(self.download_path)
-                        if os.path.splitext(apk)[1] == '.apk']
+            apkFiles = list(self.download_path.glob('*.apk'))
             self.totalNumOfApps = len(apkFiles)
             if self.totalNumOfApps != 0:
                 future_to_app = [executor.submit(get_details_from_apk,
@@ -243,23 +239,27 @@ class Play(object):
                     app = future.result()
                     if app is not None:
                         self.currentSet.append(app)
+                        packageName = get_app_detail(app, 'packageName')
+                        print('Added {} to cache'.format(packageName))
+                        #json.dump(app, open(packageName+".json","w"), indent=0)
         print('Cache correctly initialized')
         self.firstRun = False
 
+
     def insert_app_into_state(self, newApp):
-        found = False
-        result = list(filter(lambda x: x['packageName'] == newApp['packageName'],
-                             self.currentSet))
-        if len(result) > 0:
-            found = True
-            if self.debug:
-                print('%s is already cached, updating..' % newApp['packageName'])
-                i = self.currentSet.index(result[0])
-                self.currentSet[i] = newApp
-        if not found:
-            if self.debug:
-                print('Adding %s into cache..' % newApp['packageName'])
+
+        newPackageName = newget_app_detail(app, 'packageName')
+
+        exist_index = next((index for (index, app) in enumerate(app)
+                           if get_app_detail(app, 'packageName') == newPackageName), None)
+
+        if None != exist_index:
+            print("{} is already cached, updating...".format(newPackageName))
+            self.currentSet[exist_index] = newApp
+        else:
+            print("Adding {} into cache...".format(newPackageName))
             self.currentSet.append(newApp)
+
 
     def search(self, appName, numItems=15):
         if not self.loggedIn:
@@ -307,19 +307,18 @@ class Play(object):
         unavail = []
 
         for app in apps:
-            packageName = app.get('packageName')
-            # https://github.com/NoMore201/googleplay-api/commit/04ae986e00d097fb9db27f8d6bdd494f34af5f3d @2020_04_16
+            packageName = get_app_detail(app, 'packageName')
             details = self.details(packageName)
+
+            # xxx how can that be?! app is result of a query to playstore?!
             if details is None:
                 print('Package %s does not exits in Playstore' % packageName)
                 unavail.append(packageName)
                 continue
-            print('Downloading %s from Playstore' % packageName)
-            appDetails = details.get('details').get('appDetails')
-            appDetails['title'] = details['title']  
+            print('Downloading %s from Playstore' % packageName) 
             try:
-                versionCode = appDetails.get('versionCode')
-                if appDetails.get('offer')[0].get('micros') == 0:
+                versionCode = details.get_app_detail('versionCode')
+                if details.get('offer')[0].get('micros') == 0:
                     data_gen = self.service.download(packageName, versionCode)
                 else:
                     data_gen = self.service.delivery(packageName, versionCode)
@@ -332,19 +331,22 @@ class Play(object):
                 print(exc)
                 print('Failed to download %s from Playstore' % packageName)
                 failed.append(packageName)
-            else:
-                filename = packageName + '.apk'
-                filepath = os.path.join(self.download_path, filename)
-                try:
-                    with open(filepath, 'wb') as apk_file:
-                        for chunk in data_gen:
-                            apk_file.write(chunk)
-                except IOError as exc:
-                    print('Error while writing %s: %s' % (filename, exc))
-                    failed.append(packageName)
-                success.append(appDetails)
+
+            filename = packageName + '.apk'
+            filepath = self.download_path / filename
+            try:
+                with open(filepath, 'wb') as apk_file:
+                    for chunk in data_gen:
+                        apk_file.write(chunk)
+            except IOError as exc:
+                print('Error while writing %s: %s' % (filename, exc))
+                failed.append(packageName)
+
+            success.append(details)
+
         for x in success:
             self.insert_app_into_state(x)
+
         return {'status': 'SUCCESS',
                 'message': {'success': success,
                             'failed': failed,
@@ -357,39 +359,43 @@ class Play(object):
             print('There is no package')
             return {'status': 'SUCCESS',
                     'message': []}
-        else:
-            toUpdate = []
-            for app in self.currentSet:
-                packageName = app.get('packageName')
-                try:
-                  # https://github.com/NoMore201/googleplay-api/commit/04ae986e00d097fb9db27f8d6bdd494f34af5f3d @2020_04_16
-                  details = self.details(packageName)
-                  if details is None:
-                      print('%s not available in Play Store' % packageName)
-                      continue
-                  appDetails = details.get('details').get('appDetails')
-                  versionCode = app.get('versionCode')
-                  if self.debug:
-                      print('Checking %s' % packageName)
-                      print('%d == %d ?' % (versionCode, appDetails['versionCode']))
-                  if versionCode != appDetails['versionCode']:
-                      toUpdate.append(appDetails)
-                except RequestError as e:
-                  print('Cannot fetch update Information from Playstore for {}'.format(packageName))
+        toUpdate = []
+        for app in self.currentSet:
+            packageName = get_app_detail(app, 'packageName')
+            try:
+                # XXX why here no futures?!
+                details = self.details(packageName)
+                if details is None:
+                    print('%s not available in Play Store' % packageName)
+                    continue
+                thisVersionCode = get_app_detail(app, 'versionCode')
+                otherVersionCode = get_app_detail(details, 'versionCode')
+                if self.debug:
+                    print('Checking %s' % packageName)
+                    print('%d == %d ?' % (thisVersionCode, otherVersionCode))
+                if thisVersionCode != otherVersionCode:
+                    toUpdate.append(details)
+            except RequestError as e:
+                print('Cannot fetch update Information from Playstore for {}'.format(packageName))
         return {'status': 'SUCCESS',
                 'message': toUpdate}
 
     def remove_local_app(self, packageName):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
-        # get app from cache
-        app = list(filter(lambda x: x['packageName'] == packageName, self.currentSet))
-        if len(app) < 1:
+
+        if self.debug:
+            print("Going to remove {}".format(packageName))
+
+        exist_index = next((index for (index, app) in enumerate(app)
+                            if get_app_detail(app, 'packageName') == packageName), None)
+        if None == exist_index:
             return {'status': 'ERROR'}
-        filename = packageName + '.apk'
-        apkPath = os.path.join(self.download_path, filename)
-        if os.path.isfile(apkPath):
-            os.remove(apkPath)
-            self.currentSet.remove(app[0])
+        apkPath = self.download_path / packageName + '.apk'
+        if apkPath.is_file():
+            apkPath.unlink()
+            del self.currentSet[exist_index]
+            if self.debug:
+                print("Removed {}".format(packageName))
             return {'status': 'SUCCESS'}
         return {'status': 'ERROR'}

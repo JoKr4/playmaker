@@ -23,7 +23,8 @@ setup(name='playmaker',
             'pycryptodome',
             'tornado<5',
             'gpapi>=0.4.2',
-            'tornado-crontab'
+            'tornado-crontab',
+            'dict_digger'
       ],
       scripts=['pm-server']
 )
