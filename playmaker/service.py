@@ -266,7 +266,7 @@ class Play(object):
             return {'status': 'UNAUTHORIZED'}
 
         try:
-            apps = self.service.search(appName, numItems, None)
+            apps = self.service.search(appName)
         except RequestError as e:
             print(e)
             self.loggedIn = False
@@ -279,8 +279,10 @@ class Play(object):
             print(SESSION_EXPIRED_ERR)
             self.loggedIn = False
 
+        apps_nested = apps[0].get('child')[0].get('child')
+
         return {'status': 'SUCCESS',
-                'message': apps}
+                'message': apps_nested}
 
     def details(self, app):
         try:
@@ -387,11 +389,12 @@ class Play(object):
         if self.debug:
             print("Going to remove {}".format(packageName))
 
-        exist_index = next((index for (index, app) in enumerate(app)
+        exist_index = next((index for (index, app) in enumerate(self.currentSet)
                             if get_app_detail(app, 'packageName') == packageName), None)
         if None == exist_index:
             return {'status': 'ERROR'}
-        apkPath = self.download_path / packageName + '.apk'
+        filename = packageName + '.apk'
+        apkPath = self.download_path / filename
         if apkPath.is_file():
             apkPath.unlink()
             del self.currentSet[exist_index]
