@@ -24,7 +24,8 @@ def auto_update(service):
 
 # mute pyasmlparser logs 'Failed to get the attribute with namespace'
 # https://github.com/appknox/pyaxmlparser/blob/6d064a751c599fb8becbae52f44bb89fbd26457e/pyaxmlparser/core.py#L748
-logging.getLogger("pyaxmlparser.core").setLevel(logging.ERROR)
+#logging.getLogger("pyaxmlparser.core").setLevel(logging.ERROR)
+# TODO remove, not needed anymore
 
 ap = argparse.ArgumentParser(description='Apk and fdroid repository ' +
                                 'manager with a web interface.')
