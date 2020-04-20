@@ -7,6 +7,7 @@ import functools
 import tornado_crontab
 import os
 import configparser
+import logging
 
 from playmaker.server import createServer
 from playmaker.service import Play
@@ -21,51 +22,53 @@ def auto_update(service):
             service.fdroid_update()
 
 
-# tornado setup
-if __name__ == '__main__':
-    # arguments parsing
-    ap = argparse.ArgumentParser(description='Apk and fdroid repository ' +
-                                 'manager with a web interface.')
-    ap.add_argument('-f', '--fdroid', dest='fdroid',
-                    action='store_true', default=False,
-                    help='Enable fdroid integration')
-    ap.add_argument('-d', '--debug', dest='debug',
-                    action='store_true', default=False,
-                    help='Enable debug output')
-    args = ap.parse_args()
-    service = Play(debug=args.debug, fdroid=args.fdroid)
-    app = createServer(service)
+# mute pyasmlparser logs 'Failed to get the attribute with namespace'
+# https://github.com/appknox/pyaxmlparser/blob/6d064a751c599fb8becbae52f44bb89fbd26457e/pyaxmlparser/core.py#L748
+logging.getLogger("pyaxmlparser.core").setLevel(logging.ERROR)
 
-    # server setup
-    certfile = os.environ.get('HTTPS_CERTFILE')
-    keyfile = os.environ.get('HTTPS_KEYFILE')
-    server = (httpserver.HTTPServer(app)
-              if certfile is None or keyfile is None else
-              httpserver.HTTPServer(app,
-                                    ssl_options={'certfile': certfile,
-                                                 'keyfile': keyfile}))
-    server.listen(5000, address='0.0.0.0')
+ap = argparse.ArgumentParser(description='Apk and fdroid repository ' +
+                                'manager with a web interface.')
+# TODO remove, why ever without fdroid?!
+ap.add_argument('-f', '--fdroid', dest='fdroid',
+                action='store_true', default=False,
+                help='Enable fdroid integration')
+ap.add_argument('-d', '--debug', dest='debug',
+                action='store_true', default=False,
+                help='Enable debug output')
+args = ap.parse_args()
+service = Play(debug=args.debug, fdroid=args.fdroid)
+app = createServer(service)
 
-    # credentials setup
-    auth_file_parser = configparser.ConfigParser()
-    auth_file_parser.read('credentials.conf')
-    if 'google' in auth_file_parser:
-        google_section = auth_file_parser['google']
-        if 'email' in google_section and 'password' in google_section:
-            print('Using email and password from credentials file')
-            service.set_credentials(google_section['email'], google_section['password'])
-        elif 'gsfId' in google_section and 'token' in google_section:
-            service.set_token_credentials(google_section['gsfId'], google_section['token'])
+# server setup
+certfile = os.environ.get('HTTPS_CERTFILE')
+keyfile = os.environ.get('HTTPS_KEYFILE')
+server = (httpserver.HTTPServer(app)
+            if certfile is None or keyfile is None else
+            httpserver.HTTPServer(app,
+                                ssl_options={'certfile': certfile,
+                                                'keyfile': keyfile}))
+server.listen(5000, address='0.0.0.0')
 
-    if service.has_credentials():
-        service.login()
-        service.update_state()
+# credentials setup
+auth_file_parser = configparser.ConfigParser()
+auth_file_parser.read('credentials.conf')
+if 'google' in auth_file_parser:
+    google_section = auth_file_parser['google']
+    if 'email' in google_section and 'password' in google_section:
+        print('Using email and password from credentials file')
+        service.set_credentials(google_section['email'], google_section['password'])
+    elif 'gsfId' in google_section and 'token' in google_section:
+        service.set_token_credentials(google_section['gsfId'], google_section['token'])
 
-    # cron task settings
-    cron_string = os.environ.get('CRONTAB_STRING')
-    if cron_string is None:
-        # default is every night at 2AM
-        cron_string = '0 2 * * *'
-    _func = functools.partial(auto_update, *[service])
-    tornado_crontab.CronTabCallback(_func, cron_string).start()
-    io.IOLoop.instance().start()
+if service.has_credentials():
+    service.login()
+    service.update_state()
+
+# cron task settings
+cron_string = os.environ.get('CRONTAB_STRING')
+if cron_string is None:
+    # default is every night at 2AM
+    cron_string = '0 2 * * *'
+_func = functools.partial(auto_update, *[service])
+tornado_crontab.CronTabCallback(_func, cron_string).start()
+io.IOLoop.instance().start()
