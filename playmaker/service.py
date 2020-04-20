@@ -248,13 +248,16 @@ class Play(object):
 
     def insert_app_into_state(self, newApp):
 
-        newPackageName = newget_app_detail(app, 'packageName')
+        newPackageName = get_app_detail(newApp, 'packageName')
 
-        exist_index = next((index for (index, app) in enumerate(app)
-                           if get_app_detail(app, 'packageName') == newPackageName), None)
+        is_same_package = lambda app: get_app_detail(app, 'packageName') == newPackageName
+        exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
+
+        print("exist_index= {}".format(exist_index))
 
         if None != exist_index:
             print("{} is already cached, updating...".format(newPackageName))
+            # XXX keep history of recent 1-2 versions
             self.currentSet[exist_index] = newApp
         else:
             print("Adding {} into cache...".format(newPackageName))
@@ -302,8 +305,10 @@ class Play(object):
         return apps
 
     def download_selection(self, apps):
+
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
+
         success = []
         failed = []
         unavail = []
@@ -311,16 +316,15 @@ class Play(object):
         for app in apps:
             packageName = get_app_detail(app, 'packageName')
             details = self.details(packageName)
-
-            # xxx how can that be?! app is result of a query to playstore?!
             if details is None:
                 print('Package %s does not exits in Playstore' % packageName)
                 unavail.append(packageName)
                 continue
             print('Downloading %s from Playstore' % packageName) 
+            data_gen = None
             try:
-                versionCode = details.get_app_detail('versionCode')
-                if details.get('offer')[0].get('micros') == 0:
+                versionCode = get_app_detail(details, 'versionCode')
+                if details.get('offer')[0].get('micros') == '0':
                     data_gen = self.service.download(packageName, versionCode)
                 else:
                     data_gen = self.service.delivery(packageName, versionCode)
@@ -329,10 +333,12 @@ class Play(object):
                 print(exc)
                 print('Package %s does not exists in Playstore' % packageName)
                 unavail.append(packageName)
+                continue
             except Exception as exc:
                 print(exc)
                 print('Failed to download %s from Playstore' % packageName)
                 failed.append(packageName)
+                continue
 
             filename = packageName + '.apk'
             filepath = self.download_path / filename
@@ -382,23 +388,31 @@ class Play(object):
         return {'status': 'SUCCESS',
                 'message': toUpdate}
 
+
     def remove_local_app(self, packageName):
+
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
         if self.debug:
             print("Going to remove {}".format(packageName))
 
-        exist_index = next((index for (index, app) in enumerate(self.currentSet)
-                            if get_app_detail(app, 'packageName') == packageName), None)
+        is_same_package = lambda app: get_app_detail(app, 'packageName') == packageName
+        exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
+
         if None == exist_index:
             return {'status': 'ERROR'}
+
         filename = packageName + '.apk'
         apkPath = self.download_path / filename
-        if apkPath.is_file():
-            apkPath.unlink()
-            del self.currentSet[exist_index]
-            if self.debug:
-                print("Removed {}".format(packageName))
-            return {'status': 'SUCCESS'}
-        return {'status': 'ERROR'}
+
+        if not apkPath.is_file():
+            return {'status': 'ERROR'}
+
+        apkPath.unlink()
+        del self.currentSet[exist_index]
+
+        if self.debug:
+            print("Removed {}".format(packageName))
+
+        return {'status': 'SUCCESS'}
