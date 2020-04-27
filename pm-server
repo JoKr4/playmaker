@@ -8,6 +8,7 @@ import tornado_crontab
 import os
 import configparser
 import logging
+from pathlib import Path
 
 from playmaker.server import createServer
 from playmaker.service import Play
@@ -21,23 +22,19 @@ def auto_update(service):
             service.download_selection(apps)
             service.fdroid_update()
 
+app_dir = Path.cwd()
 
-# mute pyasmlparser logs 'Failed to get the attribute with namespace'
-# https://github.com/appknox/pyaxmlparser/blob/6d064a751c599fb8becbae52f44bb89fbd26457e/pyaxmlparser/core.py#L748
-#logging.getLogger("pyaxmlparser.core").setLevel(logging.ERROR)
-# TODO remove, not needed anymore
+credentials = app_dir / 'credentials.conf'
+#if not credentials.exists():
+# TODO restrict to only using this method
 
 ap = argparse.ArgumentParser(description='Apk and fdroid repository ' +
                                 'manager with a web interface.')
-# TODO remove, why ever without fdroid?!
-ap.add_argument('-f', '--fdroid', dest='fdroid',
-                action='store_true', default=False,
-                help='Enable fdroid integration')
 ap.add_argument('-d', '--debug', dest='debug',
                 action='store_true', default=False,
                 help='Enable debug output')
 args = ap.parse_args()
-service = Play(debug=args.debug, fdroid=args.fdroid)
+service = Play(app_dir, debug=args.debug)
 app = createServer(service)
 
 # server setup
@@ -52,7 +49,7 @@ server.listen(5000, address='0.0.0.0')
 
 # credentials setup
 auth_file_parser = configparser.ConfigParser()
-auth_file_parser.read('credentials.conf')
+auth_file_parser.read(credentials)
 if 'google' in auth_file_parser:
     google_section = auth_file_parser['google']
     if 'email' in google_section and 'password' in google_section:

@@ -37,11 +37,10 @@ def get_details_from_apk(packageName, service):
 
 # TODO free all functions
 class Play(object):
-    def __init__(self, debug=True, fdroid=False):
+    def __init__(self, where, debug):
         self.currentSet = []
         self.totalNumOfApps = 0
         self.debug = debug
-        self.fdroid = fdroid
         self.firstRun = True
         self.loggedIn = False
         self._email = None
@@ -50,23 +49,21 @@ class Play(object):
         self._token = None
         self._last_fdroid_update = None
 
-        self.fdroid_repo = Path.cwd() / 'repo'
+        self.fdroid             = where / 'fdroid'              # fdroid config/meta/...
+        self.fdroid_repo        = where / 'fdroid' / 'repo'     # apks for fdroid
+        self.playstore_download = where / 'playstore_download'  # apks from playstore
 
-        # configuring download folder
-        if self.fdroid:
-            self.download_path = Path.cwd() / '..' /'download'
-        else:
-            self.download_path = os.getcwd()
+        if not self.fdroid.exists():
+            self.fdroid.mkdir()
 
-        self.download_path.resolve()
+        if not self.playstore_download.exists():
+            self.playstore_download.mkdir()
 
-        if not self.download_path.exists():
-            self.download_path.mkdir()
+        # note that the 'repo' subfolder will be created in init of fdroid
 
         # configuring fdroid data
         if self.fdroid:
             self.fdroid_exe = 'fdroid'
-            self.fdroid_path = os.getcwd()
             self.fdroid_init()
 
         # language settings
@@ -80,8 +77,7 @@ class Play(object):
         if device is None:
             self.service = GooglePlayAPI(locale, timezone)
         else:
-            self.service = GooglePlayAPI(locale, timezone,
-                    device_codename=device)
+            self.service = GooglePlayAPI(locale, timezone, device_codename=device)
 
     def fdroid_init(self):
         found = False
@@ -93,7 +89,9 @@ class Play(object):
         if not found:
             print('Please install fdroid')
             sys.exit(1)
-        elif os.path.isfile('config.py'):
+        #elif os.path.isfile('config.py'):
+        fdroid_config = self.fdroid / 'config.py'
+        if fdroid_config.exists():
             print('Repo already initalized, skipping init')
         else:
             p = Popen([self.fdroid_exe, 'init', '-v'], stdout=PIPE, stderr=PIPE)
@@ -105,9 +103,9 @@ class Play(object):
         # backup config.py
         if self.debug:
             print('Checking config.py file')
-        with open('config.py', 'r') as config_file:
+        with fdroid_config.open('r') as config_file:
             content = config_file.readlines()
-        with open('config.py', 'w') as config_file:
+        with fdroid_config.open('w') as config_file:
             # copy all the original content of config.py
             # if the file was not modified with custom values, do it
             modified = False
@@ -226,10 +224,8 @@ class Play(object):
 
         print('Updating apks...')
 
-        jsonFiles = list(self.download_path.glob('*.json'))
+        jsonFiles = list(self.playstore_download.glob('*.json'))
         for j in jsonFiles:
-            if j.stem == 'index-v1': # fdroid own json
-                continue
             with open(j) as f:
                 obj = json.load(f)
                 if 'title' in obj:
@@ -241,7 +237,7 @@ class Play(object):
  
         if 0 == len(self.currentSet):
             print("No jsons found, will download them for all existing apks")
-            apkFiles = list(self.download_path.glob('*.apk'))
+            apkFiles = list(self.playstore_download.glob('*.apk'))
             with concurrent.futures.ProcessPoolExecutor() as executor:
                 future_to_app = [executor.submit(get_details_from_apk,
                                                 apk.stem,
@@ -254,19 +250,19 @@ class Play(object):
                         self.currentSet.append(app)
                         packageName = get_app_detail(app, 'packageName')
                         filenameJson = packageName + '.json'
-                        json.dump(app, open(self.download_path / filenameJson, "w"), indent=2)
+                        json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
                         # append version to apk filename
                         versionCode = get_app_detail(app, 'versionCode')
                         filenameApk = packageName + '.apk'
                         filenameApkVersion = packageName + '.apk.' + str(versionCode)
-                        os.rename(self.download_path / filenameApk, self.download_path / filenameApkVersion)
+                        os.rename(self.playstore_download / filenameApk, self.playstore_download / filenameApkVersion)
                         print("Added Version Suffix '.{}' to apk of '{}'".format(versionCode, app['title']))
 
 
         apkVersions = []
         for apk in self.currentSet:
             apkName = get_app_detail(apk, 'packageName')
-            apkVersions = list(self.download_path.glob(apkName+'.apk.*'))
+            apkVersions = list(self.playstore_download.glob(apkName+'.apk.*'))
             #print("apkVersions of '{}'= '{}'".format(apkName, apkVersions))
 
             # TODO consider info from somewhere which version to link to fdroid
@@ -381,10 +377,10 @@ class Play(object):
         #     filenameJson = packageName + '.json'
   
         #     try:
-        #         with open(self.download_path / filenameApk, 'wb') as apk_file:
+        #         with open(self.playstore_download / filenameApk, 'wb') as apk_file:
         #             for chunk in data_gen:
         #                 apk_file.write(chunk)
-        #         json.dump(app, open(self.download_path / filenameJson, "w"), indent=2)
+        #         json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
         #     except IOError as exc:
         #         print('Error while writing %s: %s' % (filename, exc))
         #         failed.append(packageName)
@@ -443,7 +439,7 @@ class Play(object):
             return {'status': 'ERROR'}
 
         filename = packageName + '.apk'
-        apkPath = self.download_path / filename
+        apkPath = self.playstore_download / filename
 
         if not apkPath.is_file():
             return {'status': 'ERROR'}

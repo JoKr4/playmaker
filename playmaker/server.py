@@ -134,7 +134,7 @@ def createServer(service):
         app = web.Application([
             (r'/', HomeHandler),
             (r'/api/(.*?)/?', ApiHandler),
-            (r'/fdroid/(.*)', web.StaticFileHandler, {'path': service.download_path}),
+            (r'/fdroid/(.*)', web.StaticFileHandler, {'path': service.fdroid_repo}),
             (r'/static/(.*)', web.StaticFileHandler, {'path': static_dir}),
             (r'/views/(.*)', web.StaticFileHandler, {'path': app_dir + '/views'}),
         ], debug=False)
