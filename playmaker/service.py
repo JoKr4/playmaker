@@ -322,7 +322,7 @@ class Play(object):
         packageName = get_app_detail(app, 'packageName')
         versionCode = get_app_detail(app, 'versionCode')
 
-        print('Downloading '{}'' from Playstore'.format(packageName))
+        print("Downloading '{}' from Playstore".format(packageName))
 
         filenameApkVersion = packageName + '.apk.' + str(versionCode)
         pathApk = self.playstore_download / filenameApkVersion
@@ -362,27 +362,32 @@ class Play(object):
         return True
 
 
-    def download_new_app(self, app):
+    def download_new_app(self, newApp):
 
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
-        packageName = get_app_detail(app, 'packageName')
+        packageName = get_app_detail(newApp, 'packageName')
+
+        is_same_package = lambda app: get_app_detail(app, 'packageName') == packageName
+        exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
+
+        if None != exist_index:
+            return {'status': 'SUCCESS'}
         
         print("Download Request for '{}'".format(packageName))
 
-        success = self.download_app(app)
+        success = self.download_app(newApp)
 
         if not success:
              return {'status': 'ERROR',
                      'message': 'Error while downloading'}
 
-        self.currentSet.append(app)
 
         filenameJson = packageName + '.json'
-        json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
+        json.dump(newApp, open(self.playstore_download / filenameJson, "w"), indent=2)
 
-        versionCode = get_app_detail(app, 'versionCode')
+        versionCode = get_app_detail(newApp, 'versionCode')
         filenameApk = packageName + '.apk'
         filenameApkVersion = filenameApk + '.' + str(versionCode)
         pathApk = self.playstore_download / filenameApkVersion
@@ -390,6 +395,8 @@ class Play(object):
         target = self.fdroid_repo / filenameApk
         os.symlink(pathApk, target)
         print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
+
+        self.currentSet.append(newApp)
 
         return {'status': 'SUCCESS'}
 
