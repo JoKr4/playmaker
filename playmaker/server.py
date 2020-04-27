@@ -49,7 +49,7 @@ def createServer(service):
             data = tornado.escape.json_decode(self.request.body)
             if data.get('download') is None:
                 return None
-            return service.download_selection(data['download'])
+            return service.download_new_app(data['download'])
 
         @run_on_executor
         def check(self):

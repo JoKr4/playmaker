@@ -79,7 +79,7 @@ angular.module('playmaker').service('api', ['$http', '$location', 'global', func
 
   this.download = function(app, callback) {
     var requestData = {
-      download: [app]
+      download: app
     };
     $http({
       method: 'POST',

@@ -316,75 +316,99 @@ class Play(object):
             self.loggedIn = False
         return apps
 
-    def update_selection(self, apps):
+
+    def download_app(self, app):
+
+        packageName = get_app_detail(app, 'packageName')
+        versionCode = get_app_detail(app, 'versionCode')
+
+        print('Downloading '{}'' from Playstore'.format(packageName))
+
+        filenameApkVersion = packageName + '.apk.' + str(versionCode)
+        pathApk = self.playstore_download / filenameApkVersion
+
+        if pathApk.exists():
+            print('Already existing: {}'.format(pathApk))
+            return True
+
+        data_gen = None
+        micros = app.get('offer')[0].get('micros')
+
+        try:
+            if micros == '0':
+                data_gen = self.service.download(packageName, versionCode)
+            else:
+                data_gen = self.service.delivery(packageName, versionCode)
+            data_gen = data_gen.get('file').get('data')
+        except IndexError as exc:
+            print(exc)
+            print('Package %s does not exists in Playstore' % packageName)
+            return False
+        except Exception as exc:
+            print(exc)
+            print('Failed to download %s from Playstore' % packageName)
+            return False
+
+        try:
+            with open(pathApk, 'wb') as apk_file:
+                for chunk in data_gen:
+                    apk_file.write(chunk)
+        except IOError as exc:
+            print('Error while writing %s: %s' % (filename, exc))
+            return False
+
+        print("Download successful: '{}'".format(packageName))
+        
+        return True
+
+
+    def download_new_app(self, app):
 
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
-    def update_apps(self, apps):
+        packageName = get_app_detail(app, 'packageName')
+        
+        print("Download Request for '{}'".format(packageName))
+
+        success = self.download_app(app)
+
+        if not success:
+             return {'status': 'ERROR',
+                     'message': 'Error while downloading'}
+
+        self.currentSet.append(app)
+
+        filenameJson = packageName + '.json'
+        json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
+
+        versionCode = get_app_detail(app, 'versionCode')
+        filenameApk = packageName + '.apk'
+        filenameApkVersion = filenameApk + '.' + str(versionCode)
+        pathApk = self.playstore_download / filenameApkVersion
+
+        target = self.fdroid_repo / filenameApk
+        os.symlink(pathApk, target)
+        print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
+
+        return {'status': 'SUCCESS'}
+
+    # def update_apps(self, apps):
+
+        # success = []
+        # failed = []
+        # unavail = []
+
+        # for app in apps:
+        #     packageName = get_app_detail(app, 'packageName')
 
 
+        # return {'status': 'SUCCESS',
+        #         'message': {'success': success,
+        #                     'failed': failed,
+        #                     'unavail': unavail}}
 
-    def download_new_app(self, apps): # NOTE also called as update function
 
-        if not self.loggedIn:
-            return {'status': 'UNAUTHORIZED'}
-
-        success = []
-        failed = []
-        unavail = []
-
-        for app in apps:
-            packageName = get_app_detail(app, 'packageName')
-            print('Downloading %s from Playstore' % packageName) 
-            data_gen = None
-            versionCode = get_app_detail(app, 'versionCode')
-            micros = app.get('offer')[0].get('micros')
-            print("type(micros)= {}".format(type(micros)))
-            try:
-                if micros == '0':
-                    data_gen = self.service.download(packageName, versionCode)
-                else:
-                    data_gen = self.service.delivery(packageName, versionCode)
-                data_gen = data_gen.get('file').get('data')
-            except IndexError as exc:
-                print(exc)
-                print('Package %s does not exists in Playstore' % packageName)
-                unavail.append(packageName)
-                continue
-            except Exception as exc:
-                print(exc)
-                print('Failed to download %s from Playstore' % packageName)
-                failed.append(packageName)
-                continue
-
-            filenameApk        = packageName + '.apk'
-            filenameApkVersion = filenameApk + '.' + str(versionCode)
-            filenameJson       = packageName + '.json'
-
-            pathApk = self.playstore_download / filenameApkVersion
-  
-            try:
-                with open(pathApk, 'wb') as apk_file:
-                    for chunk in data_gen:
-                        apk_file.write(chunk)
-                json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
-            except IOError as exc:
-                print('Error while writing %s: %s' % (filename, exc))
-                failed.append(packageName)
-
-            print("Adding {} into cache...".format(packageName))
-            self.currentSet.append(app)
-            success.append(app)
-
-            target = self.fdroid_repo / filenameApk
-            os.symlink(pathApk, target)
-            print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
-
-        return {'status': 'SUCCESS',
-                'message': {'success': success,
-                            'failed': failed,
-                            'unavail': unavail}}
 
     def check_local_apks(self):
         if not self.loggedIn:
@@ -420,25 +444,19 @@ class Play(object):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
-        if self.debug:
-            print("Going to remove {}".format(packageName))
-
         is_same_package = lambda app: get_app_detail(app, 'packageName') == packageName
         exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
 
         if None == exist_index:
             return {'status': 'ERROR'}
 
-        filename = packageName + '.apk'
-        apkPath = self.playstore_download / filename
+        filenameApk = packageName + '.apk'
+        target = self.fdroid_repo / filenameApk
 
-        if not apkPath.is_file():
-            return {'status': 'ERROR'}
-
-        apkPath.unlink()
+        target.unlink()
         del self.currentSet[exist_index]
 
         if self.debug:
-            print("Removed {}".format(packageName))
+            print("Removed Simlink to fdroid Repo for '{}'".format(packageName))
 
         return {'status': 'SUCCESS'}
