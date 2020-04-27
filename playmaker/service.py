@@ -222,7 +222,7 @@ class Play(object):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
-        print('Updating apks...')
+        print('Processing existing local apks...')
 
         jsonFiles = list(self.playstore_download.glob('*.json'))
         for j in jsonFiles:
@@ -268,34 +268,12 @@ class Play(object):
             # TODO consider info from somewhere which version to link to fdroid
             #      for now, its the most recent
             target = self.fdroid_repo / apkVersions[0].stem
-            if target.exists() and target.is_symlink():
+            if target.is_symlink():
                 target.unlink()
             os.symlink(apkVersions[0], target)
             print("Created Simlink to fdroid Repo for '{}'".format(apkVersions[0].name))
 
         self.firstRun = False
-
-
-    def insert_app_into_state(self, newApp):
-
-        newPackageName = get_app_detail(newApp, 'packageName')
-
-        is_same_package = lambda app: get_app_detail(app, 'packageName') == newPackageName
-        exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
-
-        #print("exist_index= {}".format(exist_index))
-
-        if None != exist_index:
-            print("{} is already cached, updating...".format(newPackageName))
-            # XXX keep history of recent 1-2 versions
-            self.currentSet[exist_index] = newApp
-        else:
-            print("Adding {} into cache...".format(newPackageName))
-            self.currentSet.append(newApp)
-
-        # TODO update json
-        #json.dump(app, open(packageName+".json","w"), indent=0)
-
 
     def search(self, appName, numItems=15):
         if not self.loggedIn:
@@ -316,7 +294,7 @@ class Play(object):
             self.loggedIn = False
 
         apps_nested = apps[0].get('child')[0].get('child')
-
+        # TODO if nothing found, this seem to be proposals
         # TODO return info whats already existing
         return {'status': 'SUCCESS',
                 'message': apps_nested}
@@ -338,62 +316,75 @@ class Play(object):
             self.loggedIn = False
         return apps
 
-    def download_selection(self, apps):
+    def update_selection(self, apps):
 
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
 
-        # TODO merge with 'insert_app_into_state' and focus on version handling
+    def update_apps(self, apps):
 
-        # success = []
-        # failed = []
-        # unavail = []
 
-        # for app in apps:
-        #     packageName = get_app_detail(app, 'packageName')
-        #     print('Downloading %s from Playstore' % packageName) 
-        #     data_gen = None
-        #     versionCode = get_app_detail(app, 'versionCode')
-        #     micros = app.get('offer')[0].get('micros')
-        #     print("type(micros)= ".format(type(micros)))
-        #     try:
-        #         if micros == '0':
-        #             data_gen = self.service.download(packageName, versionCode)
-        #         else:
-        #             data_gen = self.service.delivery(packageName, versionCode)
-        #         data_gen = data_gen.get('file').get('data')
-        #     except IndexError as exc:
-        #         print(exc)
-        #         print('Package %s does not exists in Playstore' % packageName)
-        #         unavail.append(packageName)
-        #         continue
-        #     except Exception as exc:
-        #         print(exc)
-        #         print('Failed to download %s from Playstore' % packageName)
-        #         failed.append(packageName)
-        #         continue
 
-        #     filenameApk = packageName + '.apk.' + str(versionCode)
-        #     filenameJson = packageName + '.json'
+    def download_new_app(self, apps): # NOTE also called as update function
+
+        if not self.loggedIn:
+            return {'status': 'UNAUTHORIZED'}
+
+        success = []
+        failed = []
+        unavail = []
+
+        for app in apps:
+            packageName = get_app_detail(app, 'packageName')
+            print('Downloading %s from Playstore' % packageName) 
+            data_gen = None
+            versionCode = get_app_detail(app, 'versionCode')
+            micros = app.get('offer')[0].get('micros')
+            print("type(micros)= {}".format(type(micros)))
+            try:
+                if micros == '0':
+                    data_gen = self.service.download(packageName, versionCode)
+                else:
+                    data_gen = self.service.delivery(packageName, versionCode)
+                data_gen = data_gen.get('file').get('data')
+            except IndexError as exc:
+                print(exc)
+                print('Package %s does not exists in Playstore' % packageName)
+                unavail.append(packageName)
+                continue
+            except Exception as exc:
+                print(exc)
+                print('Failed to download %s from Playstore' % packageName)
+                failed.append(packageName)
+                continue
+
+            filenameApk        = packageName + '.apk'
+            filenameApkVersion = filenameApk + '.' + str(versionCode)
+            filenameJson       = packageName + '.json'
+
+            pathApk = self.playstore_download / filenameApkVersion
   
-        #     try:
-        #         with open(self.playstore_download / filenameApk, 'wb') as apk_file:
-        #             for chunk in data_gen:
-        #                 apk_file.write(chunk)
-        #         json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
-        #     except IOError as exc:
-        #         print('Error while writing %s: %s' % (filename, exc))
-        #         failed.append(packageName)
+            try:
+                with open(pathApk, 'wb') as apk_file:
+                    for chunk in data_gen:
+                        apk_file.write(chunk)
+                json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
+            except IOError as exc:
+                print('Error while writing %s: %s' % (filename, exc))
+                failed.append(packageName)
 
-        #     success.append(app)
+            print("Adding {} into cache...".format(packageName))
+            self.currentSet.append(app)
+            success.append(app)
 
-        # for x in success:
-        #     self.insert_app_into_state(x)
+            target = self.fdroid_repo / filenameApk
+            os.symlink(pathApk, target)
+            print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
 
-        # return {'status': 'SUCCESS',
-        #         'message': {'success': success,
-        #                     'failed': failed,
-        #                     'unavail': unavail}}
+        return {'status': 'SUCCESS',
+                'message': {'success': success,
+                            'failed': failed,
+                            'unavail': unavail}}
 
     def check_local_apks(self):
         if not self.loggedIn:
