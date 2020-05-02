@@ -54,6 +54,7 @@ app.component('appList', {
     var ctrl = this;
 
     ctrl.apps = [];
+    ctrl.appStatus = {};
     ctrl.lastFdroidUpdate = 'None';
     ctrl.desktop = global.desktop;
     ctrl.mobile = global.mobile;
@@ -146,7 +147,9 @@ app.component('appList', {
       if (data.status === 'UNAUTHORIZED') {
         return;
       }
-      ctrl.apps = data.message.map(function(a) {
+      ctrl.appStatus = data.message.appStatus;
+      ctrl.apps = data.message.apps.map(function(a) {
+        // a.status = ctrl.appStatus[a.docid]
         if (a.aggregateRating !== undefined) {
           roundedStars = Math.floor(a.aggregateRating.starRating);
           a.formattedStars = a.aggregateRating.starRating.toFixed(1);

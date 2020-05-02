@@ -39,6 +39,7 @@ def get_details_from_apk(packageName, service):
 class Play(object):
     def __init__(self, where, debug):
         self.currentSet = []
+        self.lastAppUpdateChecks = {}
         self.totalNumOfApps = 0
         self.debug = debug
         self.firstRun = True
@@ -164,7 +165,7 @@ class Play(object):
                     'total': self.totalNumOfApps,
                     'current': len(self.currentSet)}
         return {'status': 'SUCCESS',
-                'message': sorted(self.currentSet, key=lambda k: k['title'])}
+                'message': {'apps': sorted(self.currentSet, key=lambda k: k['title']), 'appStatus': self.lastAppUpdateChecks}}
 
     def set_encoded_credentials(self, email, password):
         self._email = base64.b64decode(email).decode('utf-8')
@@ -247,11 +248,12 @@ class Play(object):
                     app = future.result()
                     if app is not None and 'title' in app:
                         print("Got json for '{}'".format(app['title']))
+
+                        self.write_app_json(app)
                         self.currentSet.append(app)
-                        packageName = get_app_detail(app, 'packageName')
-                        filenameJson = packageName + '.json'
-                        json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
+
                         # append version to apk filename
+                        packageName = get_app_detail(app, 'packageName')
                         versionCode = get_app_detail(app, 'versionCode')
                         filenameApk = packageName + '.apk'
                         filenameApkVersion = packageName + '.apk.' + str(versionCode)
@@ -260,9 +262,9 @@ class Play(object):
 
 
         apkVersions = []
-        for apk in self.currentSet:
-            apkName = get_app_detail(apk, 'packageName')
-            apkVersions = list(self.playstore_download.glob(apkName+'.apk.*'))
+        for app in self.currentSet:
+            packageName = get_app_detail(app, 'packageName')
+            apkVersions = list(self.playstore_download.glob(packageName+'.apk.*'))
             #print("apkVersions of '{}'= '{}'".format(apkName, apkVersions))
 
             # TODO consider info from somewhere which version to link to fdroid
@@ -273,7 +275,13 @@ class Play(object):
             os.symlink(apkVersions[0], target)
             print("Created Simlink to fdroid Repo for '{}'".format(apkVersions[0].name))
 
+            self.lastAppUpdateChecks[packageName] = get_app_detail(app, 'uploadDate')
+
         self.firstRun = False
+
+    def get_downloaded_apk_versions(self, app):
+        packageName = get_app_detail(app, 'packageName')
+        return list(self.playstore_download.glob(packageName+'.apk.*'))
 
     def search(self, appName, numItems=15):
         if not self.loggedIn:
@@ -354,12 +362,31 @@ class Play(object):
                 for chunk in data_gen:
                     apk_file.write(chunk)
         except IOError as exc:
-            print('Error while writing %s: %s' % (filename, exc))
+            print("Error while writing {}: {}".format(packageName, exc))
             return False
 
         print("Download successful: '{}'".format(packageName))
         
         return True
+
+
+    def write_app_json(self, app):
+        packageName = get_app_detail(app, 'packageName')
+        filenameJson = packageName + '.json'
+        json.dump(app, open(self.playstore_download / filenameJson, "w"), indent=2)
+        print("Wrote json of apk Details for '{}'".format(packageName))
+
+
+    def set_app_symlink(self, app, versionCode):
+        packageName = get_app_detail(app, 'packageName')
+        filenameApk = packageName + '.apk'
+        filenameApkVersion = filenameApk + '.' + str(versionCode)
+
+        source = self.playstore_download / filenameApkVersion
+        target = self.fdroid_repo        / filenameApk
+        os.symlink(source, target)
+
+        print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
 
 
     def download_new_app(self, newApp):
@@ -372,6 +399,7 @@ class Play(object):
         is_same_package = lambda app: get_app_detail(app, 'packageName') == packageName
         exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
 
+        # TODO web ui should not even allow downloading
         if None != exist_index:
             return {'status': 'SUCCESS'}
         
@@ -383,38 +411,26 @@ class Play(object):
              return {'status': 'ERROR',
                      'message': 'Error while downloading'}
 
-
-        filenameJson = packageName + '.json'
-        json.dump(newApp, open(self.playstore_download / filenameJson, "w"), indent=2)
-
-        versionCode = get_app_detail(newApp, 'versionCode')
-        filenameApk = packageName + '.apk'
-        filenameApkVersion = filenameApk + '.' + str(versionCode)
-        pathApk = self.playstore_download / filenameApkVersion
-
-        target = self.fdroid_repo / filenameApk
-        os.symlink(pathApk, target)
-        print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
-
+        self.write_app_json(newApp)
+        self.set_app_symlink(newApp, get_app_detail(newApp, 'versionCode'))
         self.currentSet.append(newApp)
 
         return {'status': 'SUCCESS'}
 
-    # def update_apps(self, apps):
 
-        # success = []
-        # failed = []
-        # unavail = []
+    def update_apps(self, apps):
 
-        # for app in apps:
-        #     packageName = get_app_detail(app, 'packageName')
+        for app in apps:
 
+            packageName = get_app_detail(app, 'packageName')
+            print("Download Request for '{}'".format(packageName))
 
-        # return {'status': 'SUCCESS',
-        #         'message': {'success': success,
-        #                     'failed': failed,
-        #                     'unavail': unavail}}
+            success = self.download_app(app)
+            if not success:
+                continue # silently hope the best for next scheduled update...
 
+            self.write_app_json(app)
+            self.set_app_symlink(app, get_app_detail(app, 'versionCode'))
 
 
     def check_local_apks(self):
