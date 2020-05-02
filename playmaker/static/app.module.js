@@ -56,6 +56,7 @@ app.component('appList', {
     ctrl.apps = [];
     ctrl.appStatus = {};
     ctrl.lastFdroidUpdate = 'None';
+    ctrl.lastPlaystoreUpdate = 'None';
     ctrl.desktop = global.desktop;
     ctrl.mobile = global.mobile;
     var port = $location.port();
@@ -133,7 +134,7 @@ app.component('appList', {
           return;
         }
         if (data.status === 'SUCCESS') {
-          api.fdroid(function(data) {
+          api.lastFDroidUpdate(function(data) {
             if (data.status !== 'SUCCESS') {
               return;
             }
@@ -182,11 +183,18 @@ app.component('appList', {
       });
     });
 
-    api.fdroid(function(data) {
+    api.lastFDroidUpdate(function(data) {
       if (data.status !== 'SUCCESS') {
         return;
       }
       ctrl.lastFdroidUpdate = data.message;
+    });
+
+    api.lastPlaystoreUpdate(function(data) {
+      if (data.status !== 'SUCCESS') {
+        return;
+      }
+      ctrl.lastPlaystoreUpdate = data.message;
     });
   }
 });

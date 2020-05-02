@@ -2,22 +2,25 @@
   <div class="sidebar">
     <div class="sidebar-list">
       <div class="sidebar-list-el">
-        Update applications <a ng-click="$ctrl.check()" class=
+        Update from Playstore <a ng-click="$ctrl.check()" class=
         "btn btn-default sidebar-button">
           <i class="fas fa-sync-alt" aria-hidden="true"></i>
         </a>
       </div>
       <div class="sidebar-list-el">
-        Update fdroid repo <a ng-click="$ctrl.fdroid()" class=
+        <strong>Last Update:</strong> {{$ctrl.lastPlaystoreUpdate}}
+      </div>
+      <div class="sidebar-list-el">
+        Update fdroid Repository <a ng-click="$ctrl.fdroid()" class=
         "btn btn-default">
           <i class="fab fa-android" aria-hidden="true"></i>
         </a>
       </div>
       <div class="sidebar-list-el">
-        URL: <code>{{$ctrl.baseUrl}}/fdroid</code>
+        <strong>Last Update:</strong> {{$ctrl.lastFdroidUpdate}}
       </div>
       <div class="sidebar-list-el">
-        <strong>Last update:</strong> {{$ctrl.lastFdroidUpdate}}
+        URL: <code>{{$ctrl.baseUrl}}/fdroid</code>
       </div>
     </div>
   </div>

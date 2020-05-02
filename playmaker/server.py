@@ -79,8 +79,11 @@ def createServer(service):
                 else:
                     self.clear()
                     self.set_status(400, 'You should supply a valid search query')
-            elif path == 'fdroid':
+            elif path == 'lastfdroidupdate':
                 result = yield self.get_last_fdroid_update()
+                self.write(result)
+            elif path == 'lastplaymakerupdate':
+                result = yield self.get_last_playmaker_update()
                 self.write(result)
             else:
                 self.set_status(404)

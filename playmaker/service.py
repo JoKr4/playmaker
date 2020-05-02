@@ -49,6 +49,7 @@ class Play(object):
         self._gsfId = None
         self._token = None
         self._last_fdroid_update = None
+        self.lastPlaystoreUpdate = None
 
         self.fdroid             = where / 'fdroid'              # fdroid config/meta/...
         self.fdroid_repo        = where / 'fdroid' / 'repo'     # apks for fdroid
@@ -134,13 +135,19 @@ class Play(object):
             return {'status': 'UNAUTHORIZED'}
         return {'status': 'SUCCESS',
                 'message': str(self._last_fdroid_update)}
+    
+    def get_last_playstore_update(self):
+        if not self.loggedIn:
+            return {'status': 'UNAUTHORIZED'}
+        return {'status': 'SUCCESS',
+                'message': str(self.lastPlaystoreUpdate.strftime("%d. %B %Y %H:%M"))}
 
     def fdroid_update(self):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
         if self.fdroid:
             try:
-                p = Popen([self.fdroid_exe, 'update', '-c', '--clean'],
+                p = Popen([self.fdroid_exe, 'update', '-c', '--clean'], cwd=self.fdroid, 
                           stdout=PIPE, stderr=PIPE)
                 stdout, stderr = p.communicate()
                 if p.returncode != 0:
@@ -419,6 +426,8 @@ class Play(object):
 
 
     def update_apps(self, apps):
+
+        self.lastPlaystoreUpdate = dt.now()
 
         for app in apps:
 

@@ -108,10 +108,21 @@ angular.module('playmaker').service('api', ['$http', '$location', 'global', func
       });
   };
 
-  this.fdroid = function(callback) {
+  this.lastFDroidUpdate = function(callback) {
     $http({
       method: 'GET',
-      url: '/api/fdroid'
+      url: '/api/lastfdroidupdate'
+    }).then(function success(response) {
+      callback(response.data);
+    }, function error(response) {
+      callback('err');
+    });
+  };
+
+  this.lastPlaystoreUpdate = function(callback) {
+    $http({
+      method: 'GET',
+      url: '/api/lastplaystoreupdate'
     }).then(function success(response) {
       callback(response.data);
     }, function error(response) {
