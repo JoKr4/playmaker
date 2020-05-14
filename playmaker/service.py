@@ -139,8 +139,15 @@ class Play(object):
     def get_last_playstore_update(self):
         if not self.loggedIn:
             return {'status': 'UNAUTHORIZED'}
-        return {'status': 'SUCCESS',
-                'message': str(self.lastPlaystoreUpdate.strftime("%d. %B %Y %H:%M"))}
+
+        if None != self.lastPlaystoreUpdate:
+            return {'status': 'SUCCESS',
+                    'message': str(self.lastPlaystoreUpdate.strftime("%d. %B %Y %H:%M"))}
+        else:
+            return {'status': 'SUCCESS',
+                    'message': 'None'}
+
+
 
     def fdroid_update(self):
         if not self.loggedIn:
@@ -268,19 +275,22 @@ class Play(object):
                         print("Added Version Suffix '.{}' to apk of '{}'".format(versionCode, app['title']))
 
 
-        apkVersions = []
+        #apkVersions = []
         for app in self.currentSet:
             packageName = get_app_detail(app, 'packageName')
-            apkVersions = list(self.playstore_download.glob(packageName+'.apk.*'))
-            #print("apkVersions of '{}'= '{}'".format(apkName, apkVersions))
-
+            #apkVersions = list(self.playstore_download.glob(packageName+'.apk.*'))
+            #print("apkVersions of '{}'= '{}'".format(packageName, apkVersions))
             # TODO consider info from somewhere which version to link to fdroid
             #      for now, its the most recent
-            target = self.fdroid_repo / apkVersions[0].stem
-            if target.is_symlink():
-                target.unlink()
-            os.symlink(apkVersions[0], target)
-            print("Created Simlink to fdroid Repo for '{}'".format(apkVersions[0].name))
+            # useVersion = apkVersions[-1]
+            # target = self.fdroid_repo / useVersion.stem
+            # if target.is_symlink():
+            #     target.unlink()
+            # os.symlink(useVersion, target)
+            #print("Created Simlink to fdroid Repo for '{}'".format(useVersion.name))
+
+            versionCode = get_app_detail(app, 'versionCode')
+            self.set_app_symlink(app, versionCode)
 
             self.lastAppUpdateChecks[packageName] = get_app_detail(app, 'uploadDate')
 
@@ -391,8 +401,10 @@ class Play(object):
 
         source = self.playstore_download / filenameApkVersion
         target = self.fdroid_repo        / filenameApk
-        os.symlink(source, target)
 
+        if target.is_symlink():
+            target.unlink()
+        os.symlink(source, target)
         print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
 
 
@@ -440,6 +452,11 @@ class Play(object):
 
             self.write_app_json(app)
             self.set_app_symlink(app, get_app_detail(app, 'versionCode'))
+
+            is_same_package = lambda app: get_app_detail(app, 'packageName') == packageName
+            exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
+
+            self.currentSet[exist_index] = app
 
 
     def check_local_apks(self):

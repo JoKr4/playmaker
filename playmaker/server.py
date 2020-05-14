@@ -31,6 +31,10 @@ def createServer(service):
             return service.get_last_fdroid_update()
 
         @run_on_executor
+        def get_last_playstore_update(self):
+            return service.get_last_playstore_update()
+
+        @run_on_executor
         def search(self):
             try:
                 keyword = self.get_argument('search')
@@ -50,6 +54,13 @@ def createServer(service):
             if data.get('download') is None:
                 return None
             return service.download_new_app(data['download'])
+        
+        @run_on_executor
+        def update_apps(self):
+            data = tornado.escape.json_decode(self.request.body)
+            if data.get('update') is None:
+                return None
+            return service.update_apps(data['update'])
 
         @run_on_executor
         def check(self):
@@ -82,8 +93,8 @@ def createServer(service):
             elif path == 'lastfdroidupdate':
                 result = yield self.get_last_fdroid_update()
                 self.write(result)
-            elif path == 'lastplaymakerupdate':
-                result = yield self.get_last_playmaker_update()
+            elif path == 'lastplaystoreupdate':
+                result = yield self.get_last_playstore_update()
                 self.write(result)
             else:
                 self.set_status(404)
@@ -93,6 +104,13 @@ def createServer(service):
         def post(self, path):
             if path == 'download':
                 result = yield self.download()
+                if result is None:
+                    self.clear()
+                    self.set_status(400)
+                else:
+                    self.write(result)
+            elif path == 'updateApps':
+                result = yield self.update_apps()
                 if result is None:
                     self.clear()
                     self.set_status(400)

@@ -96,13 +96,23 @@ app.component('appList', {
         if (data.status === 'SUCCESS' && data.message.length > 0) {
           global.addAlert('success', 'Updating ' + data.message.length.toString() + ' apps');
 
-          data.message.forEach(function(newApp) {
-            var oldAppIndex = ctrl.apps.findIndex(function(elem) {
-              return elem.docid === newApp.docid
-            });
-            if (oldAppIndex === -1) return;
-            updateApp(ctrl.apps[oldAppIndex]);
+          api.updateApps(data.message, function(otherData) {
+            if (otherData === 'err') {
+              global.addAlert('danger', 'Cannot get app updates');
+              return;
+            }
+            if (otherData.status === 'SUCCESS') {
+              global.addAlert('success', 'All apps updated!');
+            }
           });
+
+          // data.message.forEach(function(newApp) {
+          //   var oldAppIndex = ctrl.apps.findIndex(function(elem) {
+          //     return elem.docid === newApp.docid
+          //   });
+          //   if (oldAppIndex === -1) return;
+          //   updateApp(ctrl.apps[oldAppIndex]);
+          // });
         }
       });
     };

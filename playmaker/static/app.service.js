@@ -92,6 +92,21 @@ angular.module('playmaker').service('api', ['$http', '$location', 'global', func
       });
   };
 
+  this.updateApps = function(apps, callback) {
+    var requestData = {
+      update: apps
+    };
+    $http({
+      method: 'POST',
+      url: '/api/updateApps',
+      data: JSON.stringify(requestData)
+    }).then(function success(response) {
+        callback(response.data);
+      }, function error(response) {
+        callback('err');
+      });
+  };
+
   this.remove = function(app, callback) {
     var requestData = {
       delete: app
