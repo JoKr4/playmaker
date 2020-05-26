@@ -65,24 +65,6 @@ app.component('appList', {
       ctrl.baseUrl += ":" + port.toString();
     }
 
-    var updateApp = function(app) {
-      // app.updating = true;
-      // api.download(app, function(data) {
-      //   if (data === 'err' || data.status === 'ERROR') {
-      //     global.addAlert('danger', 'Unable to update ' + app.docid);
-      //     app.updating = false;
-      //     return;
-      //   }
-      //   if (data.message.success.length === 0) {
-      //     global.addAlert('danger', 'Unable to update ' + app.docid);
-      //     app.updating = false;
-      //     return;
-      //   }
-      //   app.versionCode = data.message.success[0].details.appDetails.versionCode;
-      //   app.updating = false;
-      // });
-    };
-
     ctrl.check = function() {
       global.addAlert('info', 'Checking for updates');
       api.check(function(data) {
@@ -95,24 +77,18 @@ app.component('appList', {
         }
         if (data.status === 'SUCCESS' && data.message.length > 0) {
           global.addAlert('success', 'Updating ' + data.message.length.toString() + ' apps');
-
-          api.updateApps(data.message, function(otherData) {
-            if (otherData === 'err') {
-              global.addAlert('danger', 'Cannot get app updates');
-              return;
-            }
-            if (otherData.status === 'SUCCESS') {
+          api.updateApps(data.message, function(updatedData) {
+            if (updatedData.status === 'SUCCESS') {
               global.addAlert('success', 'All apps updated!');
             }
+            updatedData.message.forEach(function(updatedApp) {
+              var oldAppIndex = ctrl.apps.findIndex(function(elem) {
+                return elem.details.appDetails.packageName === updatedApp.details.appDetails.packageName
+              });
+              if (oldAppIndex === -1) continue;
+              ctrl.apps[oldAppIndex] = updatedApp;
+            });
           });
-
-          // data.message.forEach(function(newApp) {
-          //   var oldAppIndex = ctrl.apps.findIndex(function(elem) {
-          //     return elem.docid === newApp.docid
-          //   });
-          //   if (oldAppIndex === -1) return;
-          //   updateApp(ctrl.apps[oldAppIndex]);
-          // });
         }
       });
     };

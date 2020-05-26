@@ -353,7 +353,7 @@ class Play(object):
         pathApk = self.playstore_download / filenameApkVersion
 
         if pathApk.exists():
-            print('Already existing: {}'.format(pathApk))
+            print('Already existing, skipping...')
             return True
 
         data_gen = None
@@ -441,6 +441,8 @@ class Play(object):
 
         self.lastPlaystoreUpdate = dt.now()
 
+        updated = []
+
         for app in apps:
 
             packageName = get_app_detail(app, 'packageName')
@@ -457,6 +459,12 @@ class Play(object):
             exist_index = next((index for (index, app) in enumerate(self.currentSet) if is_same_package(app)), None)
 
             self.currentSet[exist_index] = app
+            print("Updated App at index '{}'".format(exist_index))
+
+            updated.append(app)
+
+        return {'status' : 'SUCCESS',
+                'message': updated}
 
 
     def check_local_apks(self):
@@ -479,8 +487,8 @@ class Play(object):
                 otherVersionCode = get_app_detail(details, 'versionCode')
                 if self.debug:
                     print('Checking %s' % packageName)
-                    print('%d == %d ?' % (thisVersionCode, otherVersionCode))
-                if thisVersionCode != otherVersionCode:
+                    print('%d < %d ?' % (thisVersionCode, otherVersionCode))
+                if thisVersionCode < otherVersionCode:
                     toUpdate.append(details)
             except RequestError as e:
                 print('Cannot fetch update Information from Playstore for {}'.format(packageName))

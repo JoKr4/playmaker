@@ -19,8 +19,9 @@ def auto_update(service):
         print('Executing auto update cron task')
         apps = service.check_local_apks().get('message')
         if len(apps) > 0:
-            service.update_apps(apps)
-            #service.fdroid_update() # only for new apps?!
+            result = service.update_apps(apps)
+            if len(result.get('message')) > 0:
+                service.fdroid_update()
 
 app_dir = Path.cwd()
 
