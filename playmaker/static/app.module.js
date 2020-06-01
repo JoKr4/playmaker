@@ -68,24 +68,24 @@ app.component('appList', {
     ctrl.check = function() {
       global.addAlert('info', 'Checking for updates');
       api.check(function(data) {
-        if (data === 'err') {
+        if (data != 'SUCCESS') {
           global.addAlert('danger', 'Cannot check for updates');
           return;
         }
-        if (data.status === 'SUCCESS' && data.message.length === 0) {
+        if (data.status == 'SUCCESS' && data.message.length === 0) {
           global.addAlert('success', 'All apps are up-to-date!');
         }
-        if (data.status === 'SUCCESS' && data.message.length > 0) {
+        if (data.status == 'SUCCESS' && data.message.length > 0) {
           global.addAlert('success', 'Updating ' + data.message.length.toString() + ' apps');
           api.updateApps(data.message, function(updatedData) {
-            if (updatedData.status === 'SUCCESS') {
+            if (updatedData.status == 'SUCCESS') {
               global.addAlert('success', 'All apps updated!');
             }
             updatedData.message.forEach(function(updatedApp) {
               var oldAppIndex = ctrl.apps.findIndex(function(elem) {
-                return elem.details.appDetails.packageName === updatedApp.details.appDetails.packageName
+                return elem.details.appDetails.packageName == updatedApp.details.appDetails.packageName
               });
-              if (oldAppIndex === -1) continue;
+              if (oldAppIndex == -1) return;
               ctrl.apps[oldAppIndex] = updatedApp;
             });
           });
