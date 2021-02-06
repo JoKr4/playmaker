@@ -21,7 +21,7 @@ def createServer(service):
 
     class ApiHandler(web.RequestHandler):
         executor = ThreadPoolExecutor()
-
+        
         @run_on_executor
         def get_apps(self):
             return service.get_apps()
@@ -151,7 +151,7 @@ def createServer(service):
                 self.set_status(404)
             self.finish()
 
-    if service.fdroid:
+    if service.fdroid_enabled:
         app = web.Application([
             (r'/', HomeHandler),
             (r'/api/(.*?)/?', ApiHandler),
@@ -163,6 +163,7 @@ def createServer(service):
         app = web.Application([
             (r'/', HomeHandler),
             (r'/api/(.*?)/?', ApiHandler),
+            (r'/download/(.*)', web.StaticFileHandler, {'path': service.playstore_download}),
             (r'/static/(.*)', web.StaticFileHandler, {'path': static_dir}),
             (r'/views/(.*)', web.StaticFileHandler, {'path': app_dir + '/views'}),
         ], debug=False)

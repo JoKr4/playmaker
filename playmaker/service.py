@@ -37,7 +37,7 @@ def get_details_from_apk(packageName, service):
 
 # TODO free all functions
 class Play(object):
-    def __init__(self, where, debug):
+    def __init__(self, where, debug, fdroid_enabled):
         self.currentSet = []
         self.lastAppUpdateChecks = {}
         self.totalNumOfApps = 0
@@ -51,6 +51,7 @@ class Play(object):
         self._last_fdroid_update = None
         self.lastPlaystoreUpdate = None
 
+        self.fdroid_enabled     = fdroid_enabled
         self.fdroid             = where / 'fdroid'              # fdroid config/meta/...
         self.fdroid_repo        = where / 'fdroid' / 'repo'     # apks for fdroid
         self.playstore_download = where / 'playstore_download'  # apks from playstore
@@ -64,7 +65,7 @@ class Play(object):
         # note that the 'repo' subfolder will be created in init of fdroid
 
         # configuring fdroid data
-        if self.fdroid:
+        if self.fdroid_enabled:
             self.fdroid_exe = 'fdroid'
             self.fdroid_init()
 
@@ -75,11 +76,11 @@ class Play(object):
         timezone = os.environ.get('LANG_TIMEZONE')
         if timezone is None:
             timezone = 'Europe/Berlin'
-        device = os.environ.get('DEVICE_CODE')
-        if device is None:
-            self.service = GooglePlayAPI(locale, timezone)
-        else:
-            self.service = GooglePlayAPI(locale, timezone, device_codename=device)
+        #device = os.environ.get('DEVICE_CODE')
+        #if device is None:
+        #    self.service = GooglePlayAPI(locale, timezone)
+        #else:
+        self.service = GooglePlayAPI(locale, timezone, device_codename='walleye')
 
     def fdroid_init(self):
         found = False
@@ -96,7 +97,8 @@ class Play(object):
         if fdroid_config.exists():
             print('Repo already initalized, skipping init')
         else:
-            p = Popen([self.fdroid_exe, 'init', '-v'], stdout=PIPE, stderr=PIPE)
+            print('Init new fdroid repo')
+            p = Popen([self.fdroid_exe, 'init', '-v'], cwd=self.fdroid, stdout=PIPE, stderr=PIPE)
             stdout, stderr = p.communicate()
             if p.returncode != 0:
                 sys.stderr.write("error initializing fdroid repository " +
@@ -180,7 +182,7 @@ class Play(object):
                     'current': len(self.currentSet)}
         return {'status': 'SUCCESS',
                 'message': {'apps': sorted(self.currentSet, key=lambda k: k['title']), 'appStatus': self.lastAppUpdateChecks}}
-
+    
     def set_encoded_credentials(self, email, password):
         self._email = base64.b64decode(email).decode('utf-8')
         self._passwd = base64.b64decode(password).decode('utf-8')
@@ -205,6 +207,8 @@ class Play(object):
         try:
             if not self.has_credentials():
                 raise LoginError("missing credentials")
+            
+            print("Using login {} {}".format(self._email, self._passwd))
             self.service.login(self._email,
                                self._passwd,
                                self._gsfId,
@@ -357,13 +361,16 @@ class Play(object):
             return True
 
         data_gen = None
-        micros = app.get('offer')[0].get('micros')
+        #micros = app.get('offer')[0].get('micros')
 
         try:
-            if micros == '0':
-                data_gen = self.service.download(packageName, versionCode)
-            else:
-                data_gen = self.service.delivery(packageName, versionCode)
+            #if micros == '0':
+            #    data_gen = self.service.download(packageName, versionCode)
+            #else:
+            data_gen = self.service.delivery(packageName, versionCode)
+            splits = data_gen.get('splits')
+            if splits:
+                print("!!!!!!!!!!!!!!!!!! SPLITTED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             data_gen = data_gen.get('file').get('data')
         except IndexError as exc:
             print(exc)
@@ -382,6 +389,7 @@ class Play(object):
             print("Error while writing {}: {}".format(packageName, exc))
             return False
 
+        # TODO check file size difference to previous
         print("Download successful: '{}'".format(packageName))
         
         return True
@@ -405,6 +413,7 @@ class Play(object):
         if target.is_symlink():
             target.unlink()
         os.symlink(source, target)
+        # TODO target exists?!?
         print("Created Simlink to fdroid Repo for '{}'".format(filenameApkVersion))
 
 

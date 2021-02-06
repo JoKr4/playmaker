@@ -31,11 +31,14 @@ credentials = app_dir / 'credentials.conf'
 
 ap = argparse.ArgumentParser(description='Apk and fdroid repository ' +
                                 'manager with a web interface.')
+ap.add_argument('-f', '--fdroid', dest='fdroid',
+                action='store_true', default=False,
+                help='Enable fdroid integration')
 ap.add_argument('-d', '--debug', dest='debug',
                 action='store_true', default=False,
                 help='Enable debug output')
 args = ap.parse_args()
-service = Play(app_dir, debug=args.debug)
+service = Play(app_dir, debug=args.debug, fdroid_enabled=args.fdroid)
 app = createServer(service)
 
 # server setup
@@ -60,7 +63,8 @@ if 'google' in auth_file_parser:
         service.set_token_credentials(google_section['gsfId'], google_section['token'])
 
 if service.has_credentials():
-    service.login()
+    #service.login()
+    service.loggedIn = True
     service.update_state()
 
 # cron task settings
